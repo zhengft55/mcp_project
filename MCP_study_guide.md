@@ -1,4 +1,4 @@
-﻿# MCP 讲义（基于 weather-assistant 项目）
+# MCP 讲义（基于 weather-assistant 项目）
 
 ---
 
@@ -109,7 +109,7 @@ Server 负责把真实外部系统能力标准化暴露给 Client。它负责：
 
 ## 6. MCP 标准调用流程（时序）
 
-![MCP 调用流程画板](./images/mcp_flow.png)
+MCP 调用流程画板
 
 流程摘要：
 
@@ -280,47 +280,54 @@ def weather_trip_brief(city: str, day: str = "today", activity: str = "outdoor t
 ## 11. 高频问题排查
 
 1. `Invalid JSON: EOF while parsing`
+
 - 场景：手工在终端跑 `mcp run`。
 - 原因：`run` 需要 MCP Client 协议消息，不是手工输入模式。
 
-2. `File not found: ...mcp-serverweather-mcp-server.py`
+1. `File not found: ...mcp-serverweather-mcp-server.py`
+
 - 原因：路径缺少分隔符。
 
-3. `No interpreter found ... E:mcp_project...`
+1. `No interpreter found ... E:mcp_project...`
+
 - 原因：路径转义错误，反斜杠被吞。
 
-4. `PORT IS IN USE`（6274 / 6277）
+1. `PORT IS IN USE`（6274 / 6277）
+
 - 原因：Inspector 端口被占用。
 - 处理：释放端口后重启 `mcp dev`。
 
-5. `401 Unauthorized`
+1. `401 Unauthorized`
+
 - 原因：Key 无效或未生效。
 - 处理：检查 `env` 注入与 key 是否可用。
 
-6. `ProxyError`
+1. `ProxyError`
+
 - 原因：系统代理不可达。
 - 处理：修正代理配置或临时禁用代理后重试。
 
 ---
 
-## 12. HTTP 化与授权升级路径（进阶）
+## 12. HTTP 化与授权升级路径
 
 建议按阶段推进：
 
 1. 阶段 A：本地可用
+
 - `stdio` + 本地 env
 
-2. 阶段 B：内网服务化
+1. 阶段 B：内网服务化
+
 - 切到 HTTP/Streamable HTTP
 - 前置网关做基础鉴权（JWT/API Key）
 
-3. 阶段 C：规范化授权
+1. 阶段 C：规范化授权
+
 - 接入 OAuth 2.1 / Token 校验
 - 做 scope 控制、审计日志、最小权限
 
 原则：先稳定，再安全，再规模化。
-
-
 
 ---
 
