@@ -14,7 +14,7 @@ def ask_weather_assistant(prompt: str) -> Dict[str, Any]:
 
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
-        raise ValueError("OPENWEATHER_API_KEY is missing. Please set it in .env")
+        raise ValueError("缺少 OPENWEATHER_API_KEY，请在 .env 中配置")
 
     headers = {
         "Content-Type": "application/json",
@@ -30,11 +30,11 @@ def ask_weather_assistant(prompt: str) -> Dict[str, Any]:
 def main() -> None:
     load_dotenv()
 
-    parser = argparse.ArgumentParser(description="Call OpenWeather AI Weather Assistant API")
+    parser = argparse.ArgumentParser(description="调用 OpenWeather AI 天气助手 API")
     parser.add_argument(
         "--prompt",
         default=os.getenv("WEATHER_PROMPT", "What's weather like in London?"),
-        help="Weather question for the assistant",
+        help="向助手提问的天气相关问题",
     )
     args = parser.parse_args()
 

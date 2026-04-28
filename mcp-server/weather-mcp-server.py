@@ -15,7 +15,7 @@ def call_weather_api(prompt: str) -> Dict[str, Any]:
 
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
-        raise ValueError("OPENWEATHER_API_KEY is missing. Please set it in .env")
+        raise ValueError("缺少 OPENWEATHER_API_KEY，请在 .env 中配置")
 
     headers = {
         "Content-Type": "application/json",
@@ -34,7 +34,7 @@ def call_weather_api(prompt: str) -> Dict[str, Any]:
 
 @mcp.tool()
 def get_weather_advice(prompt: str) -> Dict[str, Any]:
-    """Ask OpenWeather AI Weather Assistant with a natural language prompt."""
+    """通过自然语言提问调用 OpenWeather AI 天气助手。"""
     try:
         result = call_weather_api(prompt)
         return {
@@ -55,22 +55,22 @@ def get_weather_advice(prompt: str) -> Dict[str, Any]:
                 detail = ""
         return {
             "ok": False,
-            "error": f"HTTP error {status}: {detail}".strip(),
+            "error": f"HTTP 错误 {status}：{detail}".strip(),
         }
     except requests.exceptions.ProxyError as exc:
-        return {"ok": False, "error": f"Proxy error: {exc}"}
+        return {"ok": False, "error": f"代理错误：{exc}"}
     except requests.exceptions.Timeout as exc:
-        return {"ok": False, "error": f"Request timeout: {exc}"}
+        return {"ok": False, "error": f"请求超时：{exc}"}
     except requests.exceptions.RequestException as exc:
-        return {"ok": False, "error": f"Request failed: {exc}"}
+        return {"ok": False, "error": f"请求失败：{exc}"}
 
 
 @mcp.prompt(
     name="weather_trip_brief",
-    description="Template for weather-aware travel/outdoor planning that uses get_weather_advice.",
+    description="天气感知型出行/户外规划模板，引导模型调用 get_weather_advice。",
 )
 def weather_trip_brief(city: str, day: str = "today", activity: str = "outdoor travel") -> str:
-    """Generate a reusable prompt template and tell the model to call weather tool first."""
+    """生成可复用的 prompt 模板，并指示模型先调用天气工具再总结。"""
     return (
         "You are a weather-aware travel assistant.\n"
         f"The user plans {activity} in {city} on {day}.\n"

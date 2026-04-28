@@ -13,15 +13,15 @@ class TestOpenAISDKCallReal(unittest.TestCase):
         load_dotenv()
         api_key = os.getenv("OPENAI_API_KEY", "")
         prompt = os.getenv("OPENAI_PROMPT", "")
-        self.assertTrue(api_key, "OPENAI_API_KEY is missing in .env")
-        self.assertNotIn("your_api_key_here", api_key, "Please set a real OPENAI_API_KEY")
+        self.assertTrue(api_key, "OPENAI_API_KEY 未在 .env 中配置")
+        self.assertNotIn("your_api_key_here", api_key, "请在 .env 中配置真实的 OPENAI_API_KEY")
 
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             openai_sdk_call.main()
 
         output = buffer.getvalue().strip()
-        self.assertTrue(output, "SDK response is empty")
+        self.assertTrue(output, "SDK 响应为空")
         print(f"User: {prompt}")
         print(f"Assistant: {output}")
 

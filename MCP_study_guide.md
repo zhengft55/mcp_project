@@ -1,10 +1,10 @@
-# MCP 讲义（基于 weather-assistant 项目）
+# MCP 搭建笔记（weather-assistant 实战）
+
+记录从认识 MCP 到把一个 weather Server 接入 Claude Desktop / Cursor 的完整过程，包含核心概念梳理、关键代码、客户端配置、踩坑记录、升级思路。
 
 ---
 
-## 1. 讲义定位
-
-这份讲义不是“概念罗列”，而是按“从认知到落地”的顺序组织：
+## 1. 整理思路
 
 1. 先建立 MCP 的标准分层认知。
 2. 再理解协议调用链和核心模块边界。
@@ -12,39 +12,22 @@
 
 ---
 
-## 2. 学习目标
+## 2. 我希望搞清楚的事
 
-完成本讲义后，你应当能：
+整理完这份笔记，要能做到：
 
 - 准确区分 Host / Client / Server 的职责边界。
 - 理解 Resources / Tools / Prompts 的定位和适用场景。
-- 独立搭建一个可运行的 MCP Server，并接入 Claude Desktop/Cursor。
+- 独立搭建一个可运行的 MCP Server，并接入 Claude Desktop / Cursor。
 - 使用 `mcp-cli` 与 Inspector 完成联调。
 - 处理常见问题（端口冲突、路径转义、401、代理异常、stdio 误用等）。
 - 理解 HTTP 化与授权的升级方向。
 
 ---
 
-## 3. 项目概览（当前仓库）
+## 3. MCP 三层架构（标准模型）
 
-核心文件：
-
-- `mcp-server/weather-mcp-server.py`：MCP Server（核心入口）
-- `weather_assistant_call.py`：独立天气 API 调用脚本（非 MCP）
-- `openai_http_call.py` / `openai_sdk_call.py`：模型调用样例
-- `.env`：本地变量
-- `images/mcp_flow.png`：MCP 调用流程图
-
-你当前 server 暴露能力：
-
-- Tool：`get_weather_advice(prompt)`
-- Prompt：`weather_trip_brief(city, day, activity)`
-
----
-
-## 4. MCP 三层架构（标准模型）
-
-## 4.1 Host（宿主应用）
+### 3.1 Host（宿主应用）
 
 Host 是用户使用的 AI 应用外壳（如 Claude Desktop、Cursor Agent）。它负责：
 
@@ -52,21 +35,21 @@ Host 是用户使用的 AI 应用外壳（如 Claude Desktop、Cursor Agent）�
 - 模型调用编排
 - 工具调用审批与展示
 
-## 4.2 Client（协议客户端）
+### 3.2 Client（协议客户端）
 
-Client 是 Host 内部“会说 MCP 协议”的组件。它负责：
+Client 是 Host 内部"会说 MCP 协议"的组件。它负责：
 
 - 与 Server 建连
 - 初始化与协议协商
-- 能力发现（list tools/resources/prompts）
+- 能力发现（list tools / resources / prompts）
 - 请求转发与结果回收
 
-## 4.3 Server（能力提供端）
+### 3.3 Server（能力提供端）
 
 Server 负责把真实外部系统能力标准化暴露给 Client。它负责：
 
-- 声明能力（tools/resources/prompts）
-- 执行后端动作（API/DB/文件系统）
+- 声明能力（tools / resources / prompts）
+- 执行后端动作（API / DB / 文件系统）
 - 返回结构化结果
 
 一句话记忆：
@@ -77,27 +60,27 @@ Server 负责把真实外部系统能力标准化暴露给 Client。它负责：
 
 ---
 
-## 5. MCP 能力模型与关键词
+## 4. MCP 能力模型与关键词
 
-## 5.1 Resources
+### 4.1 Resources
 
-- 定位：给模型“看”的只读上下文
+- 定位：给模型"看"的只读上下文
 - 常见内容：文档、schema、配置、报表、说明数据
 - 关键特征：读多写少，无副作用
 
-## 5.2 Tools
+### 4.2 Tools
 
-- 定位：给模型“做”的可执行动作
+- 定位：给模型"做"的可执行动作
 - 常见动作：查询、创建、更新、触发外部 API
 - 关键特征：有参数、可能有副作用、需要权限边界
 
-## 5.3 Prompts
+### 4.3 Prompts
 
 - 定位：可复用任务模板
 - 作用：规范任务输入，提升模型工具调用稳定性
 - 关键特征：模板本身不执行外部动作，常用于引导调用 Tool
 
-## 5.4 扩展能力（生产常见）
+### 4.4 扩展能力（生产常见）
 
 - Transport：STDIO / SSE / Streamable HTTP
 - Authorization：谁能调、代表谁调、能调什么
@@ -107,22 +90,22 @@ Server 负责把真实外部系统能力标准化暴露给 Client。它负责：
 
 ---
 
-## 6. MCP 标准调用流程（时序）
+## 5. MCP 标准调用流程（时序）
 
-MCP 调用流程画板
+![MCP 调用流程](images/mcp_flow.png)
 
 流程摘要：
 
 1. Client 初始化连接 Server，并获取可用工具列表。
-2. 用户提问后，Host 将“问题 + 可用工具信息”交给模型。
+2. 用户提问后，Host 将"问题 + 可用工具信息"交给模型。
 3. 模型决定是否调用工具；若调用，返回工具调用指令。
 4. Client 调用 MCP Server 对应 Tool。
-5. Server 调用第三方 API/本地逻辑并返回结构化结果。
+5. Server 调用第三方 API / 本地逻辑并返回结构化结果。
 6. Host 将工具结果回填模型，生成最终自然语言答复。
 
 ---
 
-## 7. 当前项目的映射关系
+## 6. 当前项目的映射关系
 
 对应路径：`mcp-server/weather-mcp-server.py`
 
@@ -135,13 +118,13 @@ MCP 调用流程画板
 
 Tool 执行链：
 
-`Client -> get_weather_advice -> call_weather_api -> OpenWeather -> structured result -> Client`
+`Client → get_weather_advice → call_weather_api → OpenWeather → structured result → Client`
 
 ---
 
-## 8. mcp-cli 安装与使用（Windows + uv）
+## 7. mcp-cli 安装与使用（Windows + uv）
 
-## 8.1 安装
+### 7.1 安装
 
 ```powershell
 cd E:\mcp_project
@@ -149,28 +132,36 @@ uv venv .venv
 uv pip install --python .venv\Scripts\python.exe "mcp[cli]"
 ```
 
-## 8.2 验证
+### 7.2 验证
 
 ```powershell
 E:\mcp_project\.venv\Scripts\mcp.exe --help
 E:\mcp_project\.venv\Scripts\mcp.exe version
 ```
 
-## 8.3 常用命令
+### 7.3 调试运行（Inspector）
 
-调试运行（Inspector）：
+Inspector 是 MCP 的核心调试工具——它扮演一个临时 Client，让你在浏览器里手动调用 Tool 验证 Server 行为。
 
 ```powershell
 E:\mcp_project\.venv\Scripts\mcp.exe dev E:\mcp_project\mcp-server\weather-mcp-server.py
 ```
 
-标准运行（供客户端托管）：
+启动后控制台会输出 Inspector URL（默认 `http://127.0.0.1:6274`）。打开后：
+
+- 左侧 Tools 面板能看到 `get_weather_advice` 自动出现
+- 点 Tool → 右侧填参数 → 点 Run → 查看结构化返回
+- Prompts 面板同理
+
+### 7.4 标准运行（供客户端 stdio 托管）
 
 ```powershell
 E:\mcp_project\.venv\Scripts\mcp.exe run E:\mcp_project\mcp-server\weather-mcp-server.py
 ```
 
-用 `uv run` 包装（可选）：
+> 注意：`mcp run` 是给 Client 用 stdio 协议对话的，**不是**给人手工输入的。手工跑会立即报 `Invalid JSON: EOF while parsing`。
+
+### 7.5 用 uv run 包装（推荐）
 
 ```powershell
 cd E:\mcp_project
@@ -180,38 +171,11 @@ uv run --active mcp run mcp-server\weather-mcp-server.py
 
 ---
 
-## 9. 客户端接入配置
+## 8. 客户端接入配置
 
-## 9.1 Claude Desktop（uv 方案）
+### 8.1 Claude Desktop
 
-文件：`C:\Users\50717\AppData\Roaming\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "weather-assistant": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--project",
-        "E:\\mcp_project",
-        "--python",
-        "E:\\mcp_project\\.venv\\Scripts\\python.exe",
-        "mcp",
-        "run",
-        "E:\\mcp_project\\mcp-server\\weather-mcp-server.py"
-      ],
-      "env": {
-        "OPENWEATHER_API_KEY": "<YOUR_OPENWEATHER_KEY>"
-      }
-    }
-  }
-}
-```
-
-## 9.2 Cursor（示例）
-
-文件：`C:\Users\50717\.cursor\mcp.json`
+文件：`C:\Users\<用户名>\AppData\Roaming\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -236,120 +200,229 @@ uv run --active mcp run mcp-server\weather-mcp-server.py
 }
 ```
 
-接入要点：
+### 8.2 Cursor
 
-- 路径在 JSON 中必须使用双反斜杠 `\\`。
-- `OPENWEATHER_API_KEY` 建议在客户端 `env` 注入，不要写死代码。
+文件：`C:\Users\<用户名>\.cursor\mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "weather-assistant": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "E:\\mcp_project",
+        "--python",
+        "E:\\mcp_project\\.venv\\Scripts\\python.exe",
+        "mcp",
+        "run",
+        "E:\\mcp_project\\mcp-server\\weather-mcp-server.py"
+      ],
+      "env": {
+        "OPENWEATHER_API_KEY": "<YOUR_OPENWEATHER_KEY>"
+      }
+    }
+  }
+}
+```
+
+### 8.3 接入要点
+
+- JSON 路径中所有 `\` 必须写成 `\\`，单反斜杠会被当转义符吞掉。
+- `OPENWEATHER_API_KEY` 通过客户端 `env` 字段注入，不写死代码。
+- 改完配置必须**完全退出**客户端进程后重启（不是关窗口）。
 
 ---
 
-## 10. 当前 Server 关键代码（节选）
+## 9. 当前 Server 关键代码
 
 文件：`mcp-server/weather-mcp-server.py`
+
+### 9.1 实例化 Server
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("weather-assistant")
+```
+
+`FastMCP` 是官方 Python SDK 的高层封装，参数是 Server 对外名字（这个名字会出现在客户端配置的 `mcpServers` 键里）。
+
+### 9.2 真正干活的函数（不带装饰器）
+
+```python
+def call_weather_api(prompt: str) -> Dict[str, Any]:
+    load_dotenv()
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+    if not api_key:
+        raise ValueError("缺少 OPENWEATHER_API_KEY，请在 .env 中配置")
+
+    headers = {"Content-Type": "application/json", "X-Api-Key": api_key}
+    response = requests.post(
+        API_URL, headers=headers, json={"prompt": prompt}, timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
+这是个纯函数——不知道 MCP 的存在。这种分层抽离让逻辑可以独立单测，也能被非 MCP 场景复用。
+
+### 9.3 暴露 Tool
 
 ```python
 @mcp.tool()
 def get_weather_advice(prompt: str) -> Dict[str, Any]:
-    result = call_weather_api(prompt)
-    return {
-        "ok": True,
-        "answer": result.get("answer", ""),
-        "session_id": result.get("session_id"),
-        "data": result.get("data", {}),
-    }
+    """通过自然语言提问调用 OpenWeather AI 天气助手。"""
+    try:
+        result = call_weather_api(prompt)
+        return {
+            "ok": True,
+            "answer": result.get("answer", ""),
+            "session_id": result.get("session_id"),
+            "data": result.get("data", {}),
+        }
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    except requests.exceptions.HTTPError as exc:
+        # 详见源码，对 401/代理/超时分别返回结构化 error
+        ...
+```
 
+设计要点：
 
+- `@mcp.tool()` 一个装饰器，函数即成 MCP Tool。
+- 函数签名（`prompt: str`）会被自动翻译成 Tool 的入参 schema 给模型看。
+- docstring 是 Tool 的**自描述**，模型靠它判断什么时候调用——写好 docstring 直接决定调用准确率。
+- 失败统一返回 `{"ok": False, "error": ...}`，不抛异常上去（Tool 抛异常对客户端不友好）。
+
+### 9.4 暴露 Prompt 模板
+
+```python
 @mcp.prompt(
     name="weather_trip_brief",
-    description="Template for weather-aware travel/outdoor planning that uses get_weather_advice.",
+    description="天气感知型出行/户外规划模板，引导模型调用 get_weather_advice。",
 )
 def weather_trip_brief(city: str, day: str = "today", activity: str = "outdoor travel") -> str:
+    """生成可复用的 prompt 模板，并指示模型先调用天气工具再总结。"""
     return (
-        f"The user plans {activity} in {city} on {day}. "
-        "First call tool get_weather_advice, then provide summary, risks, and suggestions."
+        "You are a weather-aware travel assistant.\n"
+        f"The user plans {activity} in {city} on {day}.\n"
+        "First call tool `get_weather_advice` with a clear weather question.\n"
+        "Then provide:\n"
+        "1) Short weather summary\n"
+        "2) Risk alerts (rain/wind/visibility/temperature)\n"
+        "3) Clothing and timing suggestions\n"
+        "4) Whether to proceed with the activity\n"
+        f"Tool input suggestion: What's weather like in {city} on {day}?"
     )
 ```
 
-设计说明：
+设计要点：
 
-- Tool 负责“执行真实动作”。
-- Prompt 负责“提供任务模板并引导模型先调 Tool”。
+- Prompt 本身**不**执行外部 API，它只产出一段引导文本。
+- 关键句 `First call tool get_weather_advice` 把 Prompt 和 Tool 显式串起来，引导模型按顺序使用 Tool。
+- 这是 Prompt 的典型用法：模板化高频任务并指挥模型先调 Tool 再总结。
 
----
+### 9.5 启动入口
 
-## 11. 高频问题排查
+```python
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+```
 
-1. `Invalid JSON: EOF while parsing`
-
-- 场景：手工在终端跑 `mcp run`。
-- 原因：`run` 需要 MCP Client 协议消息，不是手工输入模式。
-
-1. `File not found: ...mcp-serverweather-mcp-server.py`
-
-- 原因：路径缺少分隔符。
-
-1. `No interpreter found ... E:mcp_project...`
-
-- 原因：路径转义错误，反斜杠被吞。
-
-1. `PORT IS IN USE`（6274 / 6277）
-
-- 原因：Inspector 端口被占用。
-- 处理：释放端口后重启 `mcp dev`。
-
-1. `401 Unauthorized`
-
-- 原因：Key 无效或未生效。
-- 处理：检查 `env` 注入与 key 是否可用。
-
-1. `ProxyError`
-
-- 原因：系统代理不可达。
-- 处理：修正代理配置或临时禁用代理后重试。
+`stdio` 是最常用的本地传输——Server 通过标准输入输出与 Client 对话，不开端口、不暴露网络面，本地最安全。
 
 ---
 
-## 12. HTTP 化与授权升级路径
+## 10. 高频问题排查
 
-建议按阶段推进：
+按"症状 → 原因 → 修复"组织。
 
-1. 阶段 A：本地可用
+### 10.1 `Invalid JSON: EOF while parsing`
 
-- `stdio` + 本地 env
+- **症状**：终端手工跑 `mcp run` 后输入文本，立即报错。
+- **原因**：`mcp run` 是给 Client 用 stdio 协议对话的，不是给人手输的。
+- **修复**：调试用 `mcp dev`（带 Inspector），不要手工跑 `mcp run`。
 
-1. 阶段 B：内网服务化
+### 10.2 `File not found: ...mcp-serverweather-mcp-server.py`
 
-- 切到 HTTP/Streamable HTTP
-- 前置网关做基础鉴权（JWT/API Key）
+- **症状**：路径里反斜杠丢了。
+- **原因**：JSON 单反斜杠被当转义符吞掉。
+- **修复**：所有 `\` 写成 `\\`。
 
-1. 阶段 C：规范化授权
+### 10.3 `No interpreter found ... E:mcp_project...`
 
-- 接入 OAuth 2.1 / Token 校验
-- 做 scope 控制、审计日志、最小权限
+- **症状**：盘符后路径分隔符消失。
+- **原因**：同 10.2，路径转义错误。
+- **修复**：JSON 里所有 `\` 写成 `\\`。
+
+### 10.4 `PORT IS IN USE: 6274 / 6277`
+
+- **症状**：`mcp dev` 启动失败。
+- **原因**：Inspector 端口被旧进程或别的服务占用。
+- **修复**：
+  ```powershell
+  netstat -ano | findstr :6274
+  taskkill /PID <PID> /F
+  ```
+
+### 10.5 `401 Unauthorized`
+
+- **症状**：Tool 调用返回 401。
+- **原因**：`OPENWEATHER_API_KEY` 无效 / 没注入 / 客户端没读到。
+- **修复**：
+  - 确认 `.env` 里 KEY 正确
+  - 确认客户端配置 `env` 字段注入了 KEY
+  - 单独跑 `weather_assistant_call.py` 验证 KEY 本身可用
+
+### 10.6 `ProxyError`
+
+- **症状**：请求发不出去，报代理错。
+- **原因**：系统代理配置不可达。
+- **修复**：检查 `HTTP_PROXY` / `HTTPS_PROXY`，必要时临时清空：
+  ```powershell
+  $env:HTTPS_PROXY=""
+  ```
+
+### 10.7 客户端看不到 Server / Tool
+
+- **症状**：Claude Desktop 配置完没反应。
+- **可能原因**：
+  - 客户端没**完全退出**重启
+  - 配置 JSON 格式错误
+  - 路径转义错误（见 10.2）
+  - Server 启动直接挂掉（先在 Inspector 验证 Server 能起）
+
+---
+
+## 11. HTTP 化与授权升级路径
+
+按阶段推进：
+
+### 11.1 阶段 A：本地可用
+
+- 传输：`stdio`
+- 配置：本地 `.env`
+- 适用：个人开发、调试
+
+### 11.2 阶段 B：内网服务化
+
+- 传输：HTTP / Streamable HTTP
+- 鉴权：前置网关做 JWT / API Key
+- 适用：团队共享、跨机器
+
+### 11.3 阶段 C：规范化授权
+
+- 鉴权：OAuth 2.1 / Token 校验
+- 治理：scope 控制、审计日志、最小权限
+- 适用：生产、对外服务
 
 原则：先稳定，再安全，再规模化。
 
 ---
 
-## 13. 命令速查
-
-```powershell
-# 安装 mcp-cli
-uv pip install --python .venv\Scripts\python.exe "mcp[cli]"
-
-# 查看帮助
-E:\mcp_project\.venv\Scripts\mcp.exe --help
-
-# Inspector 调试
-uv run --active mcp dev mcp-server\weather-mcp-server.py
-
-# 标准运行
-uv run --active mcp run mcp-server\weather-mcp-server.py
-```
-
----
-
-## 14. 一句话记忆
+## 12. 一句话记忆
 
 MCP 是 AI 应用连接外部能力的标准协议：
 
@@ -359,3 +432,4 @@ MCP 是 AI 应用连接外部能力的标准协议：
 - Resource 给模型看
 - Tool 给模型做
 - Prompt 给模型模板
+

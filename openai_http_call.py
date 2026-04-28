@@ -24,7 +24,7 @@ def post_chat_completion(
                 raise
             time.sleep(1 + attempt)
 
-    raise RuntimeError(f"HTTP request failed after retries: {last_error}")
+    raise RuntimeError(f"HTTP 请求重试后仍失败：{last_error}")
 
 
 def get_weather_advice(prompt: str) -> Dict[str, Any]:
@@ -32,7 +32,7 @@ def get_weather_advice(prompt: str) -> Dict[str, Any]:
     if not api_key:
         return {
             "ok": False,
-            "error": "OPENWEATHER_API_KEY is missing. Please set it in .env",
+            "error": "缺少 OPENWEATHER_API_KEY，请在 .env 中配置",
         }
 
     headers = {
@@ -56,7 +56,7 @@ def get_weather_advice(prompt: str) -> Dict[str, Any]:
             "data": result.get("data", {}),
         }
     except requests.exceptions.RequestException as exc:
-        return {"ok": False, "error": f"Weather API request failed: {exc}"}
+        return {"ok": False, "error": f"天气 API 请求失败：{exc}"}
 
 
 def main() -> None:
@@ -70,7 +70,7 @@ def main() -> None:
     title = os.getenv("OPENROUTER_APP_TITLE", "")
 
     if not api_key:
-        raise ValueError("OPENAI_API_KEY is missing. Please set it in .env")
+        raise ValueError("缺少 OPENAI_API_KEY，请在 .env 中配置")
 
     endpoint = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -87,13 +87,13 @@ def main() -> None:
             "type": "function",
             "function": {
                 "name": "get_weather_advice",
-                "description": "Get weather advice and weather data for a specific query.",
+                "description": "针对具体的天气问题获取建议与结构化天气数据。",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "prompt": {
                             "type": "string",
-                            "description": "Weather question with location, for example: What's weather like in London?",
+                            "description": "包含地点的天气提问，例如：伦敦今天天气怎么样？",
                         }
                     },
                     "required": ["prompt"],
@@ -146,7 +146,7 @@ def main() -> None:
             if name == "get_weather_advice":
                 result = get_weather_advice(args.get("prompt", ""))
             else:
-                result = {"ok": False, "error": f"Unknown tool: {name}"}
+                result = {"ok": False, "error": f"未知工具：{name}"}
 
             messages.append(
                 {
@@ -157,7 +157,7 @@ def main() -> None:
                 }
             )
 
-    raise RuntimeError("Model did not produce a final response after tool calls")
+    raise RuntimeError("模型在工具调用后未给出最终回复")
 
 
 if __name__ == "__main__":

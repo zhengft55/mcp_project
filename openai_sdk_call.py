@@ -15,7 +15,7 @@ def main() -> None:
     title = os.getenv("OPENROUTER_APP_TITLE", "")
 
     if not api_key:
-        raise ValueError("OPENAI_API_KEY is missing. Please set it in .env")
+        raise ValueError("缺少 OPENAI_API_KEY，请在 .env 中配置")
 
     client = OpenAI(api_key=api_key, base_url=base_url)
 
